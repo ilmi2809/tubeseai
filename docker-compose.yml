@@ -1,0 +1,214 @@
+version: '3.8'
+
+services:
+  # Frontend Application
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_USER_SERVICE_URL=http://user-service:3001/graphql
+      - NEXT_PUBLIC_PRODUCT_SERVICE_URL=http://localhost:3002/graphql
+      - NEXT_PUBLIC_ORDER_SERVICE_URL=http://localhost:3003/graphql
+      - NEXT_PUBLIC_PAYMENT_SERVICE_URL=http://localhost:3004/graphql
+      - NEXT_PUBLIC_SHIPPING_SERVICE_URL=http://localhost:3005/graphql
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - payment-service
+      - shipping-service
+    networks:
+      - microservices-network
+
+  # User Service
+  user-service:
+    build: ./user-service
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - DB_HOST=user-db
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=user_db
+      - JWT_SECRET=your-super-secret-jwt-key
+    depends_on:
+      - user-db
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Product Service
+  product-service:
+    build: ./product-service
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - DB_HOST=product-db
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=product_db
+    depends_on:
+      - product-db
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Order Service
+  order-service:
+    build: ./order-service
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - DB_HOST=order-db
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=order_db
+      - USER_SERVICE_URL=http://user-service:3001/graphql
+      - PRODUCT_SERVICE_URL=http://product-service:3002/graphql
+    depends_on:
+      - order-db
+      - user-service
+      - product-service
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Payment Service
+  payment-service:
+    build: ./payment-service
+    ports:
+      - "3004:3004"
+    environment:
+      - PORT=3004
+      - DB_HOST=payment-db
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=payment_db
+      - ORDER_SERVICE_URL=http://order-service:3003/graphql
+    depends_on:
+      - payment-db
+      - order-service
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Shipping Service
+  shipping-service:
+    build: ./shipping-service
+    ports:
+      - "3005:3005"
+    environment:
+      - PORT=3005
+      - DB_HOST=shipping-db
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=shipping_db
+      - ORDER_SERVICE_URL=http://order-service:3003/graphql
+    depends_on:
+      - shipping-db
+      - order-service
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Database for User Service
+  user-db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=user_db
+    volumes:
+      - user_db_data:/var/lib/mysql
+      - ./user-service/scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "3306:3306"
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Database for Product Service
+  product-db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=product_db
+    volumes:
+      - product_db_data:/var/lib/mysql
+      - ./product-service/scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "3307:3306"
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Database for Order Service
+  order-db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=order_db
+    volumes:
+      - order_db_data:/var/lib/mysql
+      - ./order-service/scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "3308:3306"
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Database for Payment Service
+  payment-db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=payment_db
+    volumes:
+      - payment_db_data:/var/lib/mysql
+      - ./payment-service/scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "3309:3306"
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Database for Shipping Service
+  shipping-db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=shipping_db
+    volumes:
+      - shipping_db_data:/var/lib/mysql
+      - ./shipping-service/scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "3310:3306"
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Optional: phpMyAdmin for database management
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    environment:
+      - PMA_ARBITRARY=1
+    ports:
+      - "8080:80"
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+volumes:
+  user_db_data:
+  product_db_data:
+  order_db_data:
+  payment_db_data:
+  shipping_db_data:
+
+networks:
+  microservices-network:
+    driver: bridge
