@@ -1,43 +1,40 @@
+const express = require('express')
+const { ApolloServer } = require('apollo-server-express')
+const mysql = require('mysql2/promise')
+const cors = require('cors') // ✅ tambahkan
+const typeDefs = require('./schema')
+const resolvers = require('./resolvers')
+require('dotenv').config()
 
-const express = require('express');
-const { ApolloServer } = require('apollo-server-express');
-const mysql = require('mysql2/promise');
-const dotenv = require('dotenv');
-const typeDefs = require('./typeDefs');
-const resolvers = require('./resolvers');
-const { getUserFromToken } = require('./auth');
+async function startServer() {
+  const app = express()
 
-dotenv.config();
+  const pool = await mysql.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+  })
 
-const app = express();
-const port = process.env.PORT || 3000;
+  // ✅ Atur CORS sebelum applyMiddleware
+  app.use(cors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+  }))
 
-(async () => {
-  // Setup MySQL connection pool
-  const db = await mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASS || '',
-    database: process.env.DB_NAME || 'microshop',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-  });
-
-  // Initialize Apollo Server with context injection
   const server = new ApolloServer({
     typeDefs,
     resolvers,
-    context: ({ req }) => {
-      const userId = getUserFromToken(req);
-      return { db, userId };
-    }
-  });
+    context: ({ req }) => ({ pool }),
+  })
 
-  await server.start();
-  server.applyMiddleware({ app, path: '/graphql' });
+  await server.start()
+  server.applyMiddleware({ app, cors: false }) // ✅ DISABLE cors Apollo internal
 
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`User service ready at http://0.0.0.0:${port}/graphql`);
-  });
-})();
+  const PORT = process.env.PORT || 3001
+  app.listen(PORT, () => {
+    console.log(`🚀 Server ready at http://localhost:${PORT}${server.graphqlPath}`)
+  })
+}
+
+startServer()
